@@ -1,19 +1,23 @@
 import os
 import asyncio
 
-from flask import Flask, jsonify 
+from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 from playsound import playsound
 
-from lan_devices import DeviceDiscoverer
+from .lan_devices import DeviceDiscoverer
+from dotenv import load_dotenv
 
-PORT = 9000
-SUBNET = '10.10.0.0/24'
-NAME = 'Mattia'
+load_dotenv()
+
+NAME = os.getenv('VISIBLE_NAME')
+SUBNET = os.getenv('SUBNET')
 
 app = Flask(__name__)
 CORS(app)
 
+
+PORT = 9000
 AUDIO_FOLDER = './audios'
 CHECK_ENDPOINT = 'waahCavlo'
 audio_files = os.listdir(AUDIO_FOLDER)
@@ -21,7 +25,6 @@ audio_names = [file.split('.')[0] for file in audio_files]
 
 
 discoverer = DeviceDiscoverer(PORT, 2, CHECK_ENDPOINT, SUBNET)
-devices = asyncio.run(discoverer.scan_network())
 
 @app.get(f'/{CHECK_ENDPOINT}')
 def waah_cavlo():
@@ -63,6 +66,7 @@ def play_audio(name):
             except Exception as e:
                 return jsonify(message='Failed to play audio files', error=e), 500
     return jsonify(message=f'No audio file found for {name}'), 500
-            
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+
+@app.get('/')
+def home():
+    return render_template('index.html')
