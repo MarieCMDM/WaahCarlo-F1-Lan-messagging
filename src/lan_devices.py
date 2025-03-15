@@ -1,89 +1,49 @@
-import socket
-import json
-import threading
-import time
+import asyncio
+import httpx
+import ipaddress
 
-class DeviceDiscover:
-    def __init__(self, name: str):
-        self.__should_run: bool = True
-        self.__ip = self.__findLocalIp()
-        ip_parts = self.__ip.split('.')
-        ip_parts[3] = '255'
-        self.__broadcast_address = '.'.join(ip_parts)
-        self.__name = name
-        self.__listen_port = 9001
-        self.__talking_port = 9002
+class DeviceDiscoverer:
+    def __init__(self, port: int, connection_timeout: int, endpoint: str, subnet: str  = None) -> None:
+        if subnet == None:
+            #TODO autodiscover
+            raise Exception("For now subnet must be specified")
 
-        self.__listen_thread: threading.Thread = threading.Thread(target=self.__listenForHello)
-        self.__listen_thread.start()
+        self.subnet = subnet
+        self.timeout = connection_timeout
+        self.running_port = port
+        self.check_endpint = endpoint
+        
+        
+    def __generate_ip_list(self) -> list[str]:
+        network = ipaddress.IPv4Network(self.subnet, strict=False)
+        return [str(ip) for ip in network.hosts()]
 
-    def discoverLanDevices(self) -> dict:
-        devices_ip = {} 
-        message = "Waah Cavlo"
-        server_address = (self.__broadcast_address, self.__listen_port) 
+    async def __check_device(self, client: httpx.AsyncClient, ip: str,) -> tuple[str, str]:
+        url = f"http://{ip}:{self.running_port}/{self.check_endpint}"
+        try:
+            print(f"checking device: {ip}:{self.running_port}")
+            response = await client.get(url, timeout=self.timeout)
+            if response.status_code == 200:
+                data = response.json()
+                if "name" in data:
+                    return ip, data["name"]
+        except (httpx.HTTPError, ValueError):
+            print(f"No response from: {ip}:{self.running_port}")
+            return None
 
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        client_socket.bind(('0.0.0.0', self.__talking_port))
-        client_socket.settimeout(2)
+    async def scan_network(self) -> list[tuple]:
+        ip_list = self.__generate_ip_list()
+        results = []
 
-        client_socket.sendto(message.encode('utf-8'), server_address)
+        async with httpx.AsyncClient() as client:
+            tasks = [self.__check_device(client, ip) for ip in ip_list]
+            responses = await asyncio.gather(*tasks)
+            results = [res for res in responses if res]
+            print(results)
+        return results
 
-        while True:
-            try:
-                response, server = client_socket.recvfrom(1024)
-                ip, port = server
-                if ip == self._ip:
-                    continue
-                data_loaded = json.loads(response)
-
-                if ip not in devices_ip:
-                    devices_ip[ip] = data_loaded['name']
-
-            except socket.timeout:
-                print("Nessuna risposta dal server entro 5 secondi.")
-                break
-
-        client_socket.close()
-        return devices_ip
-   
-    def __findLocalIp(self) -> str:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    
-    def __listenForHello(self):
-        while self.__should_run:
-            server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allow address reuse
-            try:
-                server_socket.bind(('0.0.0.0', self.__listen_port))
-                print("Socket bound, listening for 'Waah Cavlo'...\n\n")
-
-                while self.__should_run:
-                    try:
-                        message, client_address = server_socket.recvfrom(1024)
-                        decoded_message = message.decode('utf-8')
-
-                        if decoded_message == "Waah Cavlo":
-                            message = {
-                                'name': self.__name,
-                            }
-
-                            response = json.dumps(message)
-                            server_socket.sendto(response.encode('utf-8'), client_address)
-                    except Exception as e:
-                        print(f"Error processing message: {e}")
-                        break 
-
-            except Exception as e:
-                print(f"Critical error in listenForHello: {e}")
-            finally:
-                print("Closing and cleaning up the socket")
-                server_socket.close()
-
-            # Add a delay before restarting to avoid rapid restarts
-            time.sleep(5)
-            print("Restarting the __listenForHello function...")
+if __name__ == "__main__":
+    discoverer = DeviceDiscoverer(9000, 2, 'waahCavlo', '10.10.0.0/24')
+    devices = asyncio.run(discoverer.scan_network())
+    for ip, name in devices:
+        print(f"Dispositivo trovato: {ip} -> Nome: {name}")
