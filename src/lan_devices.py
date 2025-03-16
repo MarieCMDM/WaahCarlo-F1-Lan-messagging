@@ -3,8 +3,6 @@ import httpx
 import socket
 import ipaddress
 
-
-
 class DeviceDiscoverer:
     def __init__(self, port: int, connection_timeout: int, endpoint: str, subnet: str  = None) -> None:
         if subnet == None:
@@ -33,11 +31,11 @@ class DeviceDiscoverer:
             return None
         url = f"http://{ip}:{self.running_port}/{self.check_endpint}"
         try:
-            print(f"checking device: {ip}:{self.running_port}")
             response = await client.get(url, timeout=self.timeout)
             if response.status_code == 200:
                 data = response.json()
                 if "name" in data:
+                    print(f"Found device: {ip}:{self.running_port}")
                     return ip, data["name"]
         except (httpx.HTTPError, ValueError):
             print(f"No response from: {ip}:{self.running_port}")
@@ -51,11 +49,4 @@ class DeviceDiscoverer:
             tasks = [self.__check_device(client, ip) for ip in ip_list]
             responses = await asyncio.gather(*tasks)
             results = [res for res in responses if res]
-            print(results)
         return results
-
-if __name__ == "__main__":
-    discoverer = DeviceDiscoverer(9000, 2, 'waahCavlo', '10.10.0.0/24')
-    devices = asyncio.run(discoverer.scan_network())
-    for ip, name in devices:
-        print(f"Dispositivo trovato: {ip} -> Nome: {name}")

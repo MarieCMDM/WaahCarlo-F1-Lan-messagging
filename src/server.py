@@ -1,7 +1,7 @@
 import os
 import asyncio
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 from playsound import playsound
 
@@ -26,6 +26,15 @@ audio_names = [file.split('.')[0] for file in audio_files]
 
 discoverer = DeviceDiscoverer(PORT, 2, CHECK_ENDPOINT, SUBNET)
 
+def is_localhost_request():
+    return  request.remote_addr == "127.0.0.1" or request.remote_addr == "::1" or request.remote_addr == 'localhost'
+
+@app.get('/')
+def index():
+    if not is_localhost_request():
+        return jsonify(error="Unautorized"), 403
+    return render_template('index.html')
+
 @app.get(f'/{CHECK_ENDPOINT}')
 def waah_cavlo():
     return jsonify(name=NAME)
@@ -35,9 +44,7 @@ def get_devices():
     devices = {}
     try:
         discovered_devices = asyncio.run(discoverer.scan_network())
-        print(discovered_devices)
         for device_ip, device_name in discovered_devices:
-            print(device_ip, device_name)
             devices[device_ip] = device_name
         return jsonify(devices=devices), 200
     except Exception as e:
@@ -66,7 +73,3 @@ def play_audio(name):
             except Exception as e:
                 return jsonify(message='Failed to play audio files', error=e), 500
     return jsonify(message=f'No audio file found for {name}'), 500
-
-@app.get('/')
-def home():
-    return render_template('index.html')
