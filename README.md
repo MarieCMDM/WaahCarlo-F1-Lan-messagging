@@ -8,6 +8,7 @@ create an `.env` like below:
 ```sh
 VISIBLE_NAME=MarieCMDM
 SUBNET=192.168.1.0/24
+GROUP_SECRET=my_secret
 ```
 Put in `VISIBLE_NAME` the name that will be used to identify your devie in the lan and in `SUBNET` the subnet address/mask of your lan
 

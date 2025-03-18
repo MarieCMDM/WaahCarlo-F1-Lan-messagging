@@ -26,12 +26,13 @@ class DeviceDiscoverer:
         network = ipaddress.IPv4Network(self.subnet, strict=False)
         return [str(ip) for ip in network.hosts()]
 
-    async def __check_device(self, client: httpx.AsyncClient, ip: str,) -> tuple[str, str]:
+    async def __check_device(self, client: httpx.AsyncClient, ip: str, secret: str) -> tuple[str, str]:
         if ip == self.ip:
             return None
+        params = {'secret', secret}
         url = f"http://{ip}:{self.running_port}/{self.check_endpint}"
         try:
-            response = await client.get(url, timeout=self.timeout)
+            response = await client.get(url, timeout=self.timeout, params=params)
             if response.status_code == 200:
                 data = response.json()
                 if "name" in data:
@@ -41,12 +42,12 @@ class DeviceDiscoverer:
             print(f"No response from: {ip}:{self.running_port}")
             return None
 
-    async def scan_network(self) -> list[tuple]:
+    async def scan_network(self, secret: str) -> list[tuple]:
         ip_list = self.__generate_ip_list()
         results = []
 
         async with httpx.AsyncClient() as client:
-            tasks = [self.__check_device(client, ip) for ip in ip_list]
+            tasks = [self.__check_device(client, ip, secret) for ip in ip_list]
             responses = await asyncio.gather(*tasks)
             results = [res for res in responses if res]
         return results

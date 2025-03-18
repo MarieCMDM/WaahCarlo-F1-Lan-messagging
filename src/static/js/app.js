@@ -30,7 +30,7 @@ function selectDevice(ip, name) {
 }
 
 function loadAudioFiles() {
-    $.get(`http://${selectedDeviceIp}:9000/audio/`, function(data) {
+    $.get(`/proxy/${selectedDeviceIp}audio/`, function(data) {
         $('#audio-list').empty();
         data.audios.forEach(audio => {
             $('#audio-list').append(
@@ -47,7 +47,7 @@ function playAudio(audio) {
         showPopup('Seleziona prima un dispositivo');
         return;
     }
-    $.post(`http://${selectedDeviceIp}:9000/audio/${audio}/`, function(response) {
+    $.post(`/proxy/${selectedDeviceIp}/audio/${audio}/`, function(response) {
         showPopup(`Riproduzione terminata su ${selectedDeviceName}`);
     }).fail(function() {
         showPopup('Errore durante la riproduzione dell audio');
