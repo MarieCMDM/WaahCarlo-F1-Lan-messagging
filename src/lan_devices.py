@@ -29,7 +29,7 @@ class DeviceDiscoverer:
     async def __check_device(self, client: httpx.AsyncClient, ip: str, secret: str) -> tuple[str, str]:
         if ip == self.ip:
             return None
-        params = {'secret', secret}
+        params = {'secret': secret}
         url = f"http://{ip}:{self.running_port}/{self.check_endpint}"
         try:
             response = await client.get(url, timeout=self.timeout, params=params)

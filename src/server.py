@@ -1,5 +1,6 @@
 import os
 import asyncio
+import httpx
 from functools import wraps
 from typing import Callable
 from flask import Flask, jsonify, render_template, request
@@ -20,13 +21,15 @@ CORS(app)
 
 
 PORT = 9000
+REQUEST_TIMEOUT = 2
 AUDIO_FOLDER = './audios'
 CHECK_ENDPOINT = 'waahCavlo'
 audio_files = os.listdir(AUDIO_FOLDER)
 audio_names = [file.split('.')[0] for file in audio_files]
 
 
-discoverer = DeviceDiscoverer(PORT, 2, CHECK_ENDPOINT, SUBNET)
+discoverer = DeviceDiscoverer(PORT, REQUEST_TIMEOUT, CHECK_ENDPOINT, SUBNET)
+httpx_client = httpx.Client()
 
 def is_localhost_request(f: Callable):
     @wraps(f)
@@ -63,6 +66,7 @@ def get_devices():
             devices[device_ip] = device_name
         return jsonify(devices=devices), 200
     except Exception as e:
+        print(e)
         return jsonify(message='Failed to get local devices'), 500
 
 # @app.post('/dev/audio/files/reload/')
@@ -90,7 +94,8 @@ def get_audios_on_remote(device: str):
     try:
         params = {'secret': SECRET_KEY}
         url = f'http://{device}:{PORT}/audio/'
-        return request.get(url, params=params)
+        response = httpx_client.get(url, params=params)
+        return response.json()
     except Exception as e:
         return jsonify(message='Failed to play audio files on remote'), 500
     
@@ -100,7 +105,8 @@ def play_on_remote(device: str, name: str):
     try:
         params = {'secret': SECRET_KEY}
         url = f'http://{device}:{PORT}/audio/{name}/'
-        return request.post(url, params=params)
+        response = httpx_client.post(url, params=params)
+        return response.json()
     except Exception as e:
         return jsonify(message='Failed to play audio files on remote',), 500
 

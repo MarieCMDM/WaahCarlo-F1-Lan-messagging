@@ -30,7 +30,7 @@ function selectDevice(ip, name) {
 }
 
 function loadAudioFiles() {
-    $.get(`/proxy/${selectedDeviceIp}audio/`, function(data) {
+    $.get(`/proxy/${selectedDeviceIp}/audio/`, function(data) {
         $('#audio-list').empty();
         data.audios.forEach(audio => {
             $('#audio-list').append(
